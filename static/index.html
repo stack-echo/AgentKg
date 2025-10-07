@@ -1,0 +1,1482 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>知识图谱管理系统</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.6/dist/vis-network.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-color: #667eea;
+            --secondary-color: #764ba2;
+            --success-color: #48bb78;
+            --danger-color: #f56565;
+            --dark-bg: #1a202c;
+            --card-bg: #2d3748;
+            --text-primary: #e2e8f0;
+            --text-secondary: #a0aec0;
+            --border-color: #4a5568;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            padding: 40px 0;
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            border-radius: 20px;
+            margin-bottom: 40px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            margin-bottom: 10px;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 30px;
+        }
+
+        .control-panel {
+            background: var(--card-bg);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            height: fit-content;
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section-title {
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            color: var(--primary-color);
+        }
+
+        .file-upload-area {
+            border: 2px dashed var(--border-color);
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            background: rgba(102, 126, 234, 0.05);
+            transition: all 0.3s ease;
+        }
+
+        .file-upload-area:hover {
+            border-color: var(--primary-color);
+            background: rgba(102, 126, 234, 0.1);
+        }
+
+        .file-upload-area.drag-over {
+            border-color: var(--success-color);
+            background: rgba(72, 187, 120, 0.1);
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .file-info {
+            margin-top: 15px;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            display: none;
+        }
+
+        .file-info.active {
+            display: block;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            width: 100%;
+            margin-bottom: 12px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, var(--success-color) 0%, #38a169 100%);
+            color: white;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, var(--danger-color) 0%, #e53e3e 100%);
+            color: white;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .graph-container {
+            background: var(--card-bg);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        #network {
+            width: 100%;
+            height: 400px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            margin-bottom: 20px;
+        }
+
+        .loading-indicator {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: none;
+        }
+
+        .loading-indicator.active {
+            display: block;
+        }
+
+        .result-panel {
+            background: #2d3748;
+            border-radius: 12px;
+            padding: 25px;
+            border: 1px solid #e2e8f0;
+            min-height: 400px;
+        }
+
+        .result-panel h3 {
+            color: var(--primary-color);
+            margin-bottom: 20px;
+            font-size: 1.3rem;
+        }
+
+        .result-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 10px;
+        }
+
+        .tab-btn {
+            padding: 10px 20px;
+            background: transparent;
+            border: none;
+            color: #718096;
+            cursor: pointer;
+            border-radius: 8px 8px 0 0;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+
+        .tab-btn.active {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            color: white;
+        }
+
+        .tab-btn:hover:not(.active) {
+            background: rgba(102, 126, 234, 0.1);
+        }
+
+        .tab-content {
+            display: none;
+            max-height: 350px;
+            overflow-y: auto;
+            padding: 15px;
+            background: #f7fafc;
+            border-radius: 8px;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .tab-content::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .tab-content::-webkit-scrollbar-track {
+            background: #e2e8f0;
+            border-radius: 4px;
+        }
+
+        .tab-content::-webkit-scrollbar-thumb {
+            background: var(--primary-color);
+            border-radius: 4px;
+        }
+
+        .entity-tag {
+            display: inline-block;
+            padding: 8px 16px;
+            margin: 5px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%);
+            border: 1px solid var(--primary-color);
+            color: #2d3748;
+            font-weight: 500;
+        }
+
+        .relation-item, .event-item {
+            padding: 12px 15px;
+            margin: 10px 0;
+            background: white;
+            border-radius: 8px;
+            border-left: 4px solid var(--primary-color);
+            color: #2d3748;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .relation-item strong, .event-item strong {
+            color: var(--primary-color);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #a0aec0;
+        }
+
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+        }
+
+        .processing-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .processing-overlay.active {
+            display: flex;
+        }
+
+        .processing-content {
+            background: var(--card-bg);
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            max-width: 400px;
+        }
+
+        .progress-container {
+            width: 100%;
+            height: 25px;
+            background: var(--border-color);
+            border-radius: 12px;
+            margin: 20px 0;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            width: 0%;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid var(--border-color);
+            border-top: 4px solid var(--primary-color);
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            #network {
+                height: 300px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>知识图谱管理系统</h1>
+            <p>智能文档分析与知识图谱构建平台</p>
+        </div>
+
+        <div class="main-content">
+            <div class="control-panel">
+                <div class="section">
+                    <h3 class="section-title">文件上传</h3>
+                    <div class="file-upload-area" id="uploadArea">
+                        <div class="upload-icon">📄</div>
+                        <p>点击选择文件或拖拽文件到此处</p>
+                        <p style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 10px;">
+                            支持格式: .txt, .docx, .pdf
+                        </p>
+                    </div>
+                    <input type="file" id="fileInput" accept=".txt,.docx,.pdf">
+                    <div class="file-info" id="fileInfo">
+                        <strong>已选择文件:</strong>
+                        <span id="fileName"></span>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h3 class="section-title">操作控制</h3>
+                    <button class="btn btn-primary" id="processBtn" disabled>生成知识图谱</button>
+                    <button class="btn btn-success" id="refreshBtn">刷新图谱</button>
+                    <button class="btn btn-danger" id="clearBtn">清空图谱</button>
+                </div>
+
+                <div class="section">
+                    <h3 class="section-title">图谱管理</h3>
+                    <button class="btn btn-primary" id="exportBtn">导出图谱 (JSON)</button>
+                    <button class="btn btn-primary" id="exportCsvBtn">导出为 CSV</button>
+
+                    <button class="btn btn-success" id="importJsonBtn">导入图谱 (JSON)</button>
+                    <input type="file" id="importFileInput" accept=".json" style="display: none;">
+
+                    <button class="btn btn-success" id="importCsvNodesBtn">导入CSV (节点)</button>
+                    <input type="file" id="importCsvNodesInput" accept=".csv" style="display: none;">
+
+                    <button class="btn btn-success" id="importCsvEdgesBtn">导入CSV (边)</button>
+                    <input type="file" id="importCsvEdgesInput" accept=".csv" style="display: none;">
+                </div>
+
+                <div class="section">
+                    <h3 class="section-title">分析历史</h3>
+                    <button class="btn btn-primary" id="viewHistoryBtn">查看历史</button>
+                    <div id="historyList" style="display: none; margin-top: 10px; max-height: 300px; overflow-y: auto;"></div>
+                </div>
+
+                <div class="section">
+                    <h3 class="section-title">显示控制</h3>
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; color: var(--text-secondary);">
+                            显示节点数量: <span id="nodeCountLabel" style="color: var(--primary-color); font-weight: bold;">100</span>
+                        </label>
+                        <input type="range" id="nodeCountSlider" min="10" max="200" value="200" style="width: 100%;">
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; color: var(--text-secondary);">实体类型过滤:</label>
+                        <div id="entityTypeFilters" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                            <label style="display: inline-flex; align-items: center;">
+                                <input type="checkbox" checked data-type="PERSON" style="margin-right: 5px;">人物
+                            </label>
+                            <label style="display: inline-flex; align-items: center;">
+                                <input type="checkbox" checked data-type="ORGANIZATION" style="margin-right: 5px;">机构
+                            </label>
+                            <label style="display: inline-flex; align-items: center;">
+                                <input type="checkbox" checked data-type="LOCATION" style="margin-right: 5px;">地点
+                            </label>
+                            <label style="display: inline-flex; align-items: center;">
+                                <input type="checkbox" checked data-type="PROJECT" style="margin-right: 5px;">项目
+                            </label>
+                            <label style="display: inline-flex; align-items: center; grid-column: span 2;">
+                                <input type="checkbox" checked data-type="CONCEPT" style="margin-right: 5px;">概念
+                            </label>
+                        </div>
+                    </div>
+                    <input type="text" id="searchInput" placeholder="搜索节点..."
+                           style="width: 100%; padding: 8px; border: 1px solid var(--border-color);
+                           border-radius: 6px; background: var(--dark-bg); color: var(--text-primary); margin-bottom: 10px;">
+                    <button class="btn btn-primary" id="resetFiltersBtn">重置过滤器</button>
+                </div>
+            </div>
+
+            <div class="graph-container">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="nodeCount">0</div>
+                        <div class="stat-label">节点数量</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="edgeCount">0</div>
+                        <div class="stat-label">关系数量</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="entityCount">0</div>
+                        <div class="stat-label">实体数量</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="eventCount">0</div>
+                        <div class="stat-label">事件数量</div>
+                    </div>
+                </div>
+
+                <div style="position: relative;">
+                    <div id="network"></div>
+                    <div class="loading-indicator" id="loadingIndicator">
+                        <div class="spinner" style="width: 30px; height: 30px;"></div>
+                        <p>正在渲染图谱...</p>
+                    </div>
+                </div>
+
+                <div class="result-panel" id="resultPanel">
+                    <h3>📊 分析结果</h3>
+                    <div class="result-tabs">
+                        <button class="tab-btn active" data-tab="entities">实体</button>
+                        <button class="tab-btn" data-tab="relations">关系</button>
+                        <button class="tab-btn" data-tab="events">事件</button>
+                        <button class="tab-btn" data-tab="enhanced">语义增强</button>
+                    </div>
+                    <div class="tab-content active" id="entities-tab">
+                        <div class="empty-state">
+                            <div class="empty-state-icon">🏷️</div>
+                            <p>暂无实体数据</p>
+                            <p style="font-size: 0.9rem; margin-top: 10px;">上传文档后,系统将自动识别实体</p>
+                        </div>
+                    </div>
+                    <div class="tab-content" id="relations-tab">
+                        <div class="empty-state">
+                            <div class="empty-state-icon">🔗</div>
+                            <p>暂无关系数据</p>
+                            <p style="font-size: 0.9rem; margin-top: 10px;">上传文档后,系统将自动提取关系</p>
+                        </div>
+                    </div>
+                    <div class="tab-content" id="events-tab">
+                        <div class="empty-state">
+                            <div class="empty-state-icon">📅</div>
+                            <p>暂无事件数据</p>
+                            <p style="font-size: 0.9rem; margin-top: 10px;">上传文档后,系统将自动识别事件</p>
+                        </div>
+                    </div>
+                    <div class="tab-content" id="enhanced-tab">
+                        <div class="empty-state">
+                            <div class="empty-state-icon">🧠</div>
+                            <p>暂无语义增强数据</p>
+                            <p style="font-size: 0.9rem; margin-top: 10px;">上传文档后,系统将进行语义增强</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="processing-overlay" id="processingOverlay">
+        <div class="processing-content">
+            <div class="spinner"></div>
+            <h2>正在处理...</h2>
+            <p id="processingMessage">正在分析文档并构建知识图谱</p>
+            <div class="progress-container">
+                <div class="progress-bar" id="progressBar">0%</div>
+            </div>
+            <button class="btn btn-danger" id="cancelBtn" style="margin-top: 20px;">取消处理</button>
+        </div>
+    </div>
+
+    <script>
+    let network = null;
+    let selectedFile = null;
+    let currentTaskId = null;
+    let progressInterval = null;
+    let isProcessingComplete = false;
+    let allNodes = new vis.DataSet([]);
+    let allEdges = new vis.DataSet([]);
+    let filteredNodes = new vis.DataSet([]);
+    let filteredEdges = new vis.DataSet([]);
+
+    // 初始化
+    document.addEventListener('DOMContentLoaded', function() {
+        initializeNetwork();
+        initFileUpload();
+        initButtons();
+        initFilters();
+        loadGraph().then(() => loadLatestAnalysis());
+    });
+
+    // 初始化网络图
+    function initializeNetwork() {
+        const container = document.getElementById('network');
+        const options = {
+            nodes: {
+                shape: 'dot',
+                size: 15,
+                font: { size: 12, color: '#ffffff' }
+            },
+            edges: {
+                font: { size: 10, color: '#a0aec0' },
+                arrows: { to: { enabled: true, scaleFactor: 0.6 } }
+            },
+            physics: {
+                enabled: true,
+                barnesHut: { gravitationalConstant: -2000, centralGravity: 0.1, springLength: 80 }
+            }
+        };
+        network = new vis.Network(container, { nodes: filteredNodes, edges: filteredEdges }, options);
+        network.on('stabilizationIterationsDone', () => {
+            document.getElementById('loadingIndicator').classList.remove('active');
+        });
+    }
+
+    // 初始化文件上传
+    function initFileUpload() {
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+
+        uploadArea.addEventListener('click', function(e) {
+            e.stopPropagation();
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files[0]) handleFile(e.target.files[0]);
+        });
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('drag-over');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('drag-over');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('drag-over');
+            if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+        });
+    }
+
+    // 处理文件选择
+    function handleFile(file) {
+        const validTypes = ['.txt', '.docx', '.pdf'];
+        const fileExt = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+
+        if (!validTypes.includes(fileExt)) {
+            alert('请选择支持的文件格式!');
+            return;
+        }
+
+        if (file.size > 50 * 1024 * 1024) {
+            alert('文件大小不能超过50MB!');
+            return;
+        }
+
+        selectedFile = file;
+        document.getElementById('fileName').textContent = file.name;
+        document.getElementById('fileInfo').classList.add('active');
+        document.getElementById('processBtn').disabled = false;
+    }
+
+    // 初始化按钮
+    function initButtons() {
+        document.getElementById('processBtn').addEventListener('click', processDocument);
+        document.getElementById('refreshBtn').addEventListener('click', loadGraph);
+        document.getElementById('clearBtn').addEventListener('click', clearGraph);
+        document.getElementById('resetFiltersBtn').addEventListener('click', resetFilters);
+        document.getElementById('exportBtn').addEventListener('click', exportGraph);
+        document.getElementById('exportCsvBtn').addEventListener('click', exportGraphAsCsv);
+
+        // JSON导入 - 修复点击问题
+        const importJsonBtn = document.getElementById('importJsonBtn');
+        const importFileInput = document.getElementById('importFileInput');
+
+        if (importJsonBtn && importFileInput) {
+            importJsonBtn.onclick = function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('🔵 JSON导入按钮被点击');
+                importFileInput.value = '';
+                setTimeout(() => {
+                    importFileInput.click();
+                }, 10);
+            };
+
+            importFileInput.onchange = function(e) {
+                console.log('📁 文件已选择:', e.target.files[0]?.name);
+                handleImportFile(e);
+            };
+        }
+
+        // CSV节点导入 - 修复点击问题
+        const importCsvNodesBtn = document.getElementById('importCsvNodesBtn');
+        const importCsvNodesInput = document.getElementById('importCsvNodesInput');
+
+        if (importCsvNodesBtn && importCsvNodesInput) {
+            importCsvNodesBtn.onclick = function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('🔵 CSV节点导入按钮被点击');
+                importCsvNodesInput.value = '';
+                setTimeout(() => {
+                    importCsvNodesInput.click();
+                }, 10);
+            };
+
+            importCsvNodesInput.onchange = function(e) {
+                console.log('📁 节点文件已选择:', e.target.files[0]?.name);
+                handleCsvNodesImport(e);
+            };
+        }
+
+        // CSV边导入 - 修复点击问题
+        const importCsvEdgesBtn = document.getElementById('importCsvEdgesBtn');
+        const importCsvEdgesInput = document.getElementById('importCsvEdgesInput');
+
+        if (importCsvEdgesBtn && importCsvEdgesInput) {
+            importCsvEdgesBtn.onclick = function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('🔵 CSV边导入按钮被点击');
+                importCsvEdgesInput.value = '';
+                setTimeout(() => {
+                    importCsvEdgesInput.click();
+                }, 10);
+            };
+
+            importCsvEdgesInput.onchange = function(e) {
+                console.log('📁 边文件已选择:', e.target.files[0]?.name);
+                handleCsvEdgesImport(e);
+            };
+        }
+
+        document.getElementById('viewHistoryBtn').addEventListener('click', toggleHistoryView);
+        document.getElementById('cancelBtn').addEventListener('click', () => {
+            if (progressInterval) clearInterval(progressInterval);
+            isProcessingComplete = true;
+            showProcessing(false);
+        });
+
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+        });
+    }
+
+    // 初始化过滤器
+    function initFilters() {
+        document.getElementById('nodeCountSlider').addEventListener('input', (e) => {
+            document.getElementById('nodeCountLabel').textContent = e.target.value;
+            throttledFilterGraph();
+        });
+
+        document.querySelectorAll('#entityTypeFilters input').forEach(cb => {
+            cb.addEventListener('change', throttledFilterGraph);
+        });
+
+        document.getElementById('searchInput').addEventListener('input', throttledFilterGraph);
+    }
+
+    // 节流函数
+    function throttle(func, limit) {
+        let inThrottle;
+        return function() {
+            const args = arguments;
+            const context = this;
+            if (!inThrottle) {
+                func.apply(context, args);
+                inThrottle = true;
+                setTimeout(() => inThrottle = false, limit);
+            }
+        }
+    }
+
+    const throttledFilterGraph = throttle(filterGraph, 300);
+
+    // 过滤图谱 - 完全修复的版本
+    function filterGraph() {
+        if (!allNodes || allNodes.length === 0) {
+            console.log('⚠️ 没有数据');
+            return;
+        }
+
+        const maxNodes = parseInt(document.getElementById('nodeCountSlider').value) || 200;
+        const searchTerm = (document.getElementById('searchInput').value || '').trim().toLowerCase();
+
+        let allNodeData = allNodes.get();
+        let allEdgeData = allEdges.get();
+
+        // ⭐ 简化：只按搜索词过滤，不过滤类型
+        let filtered = allNodeData;
+
+        if (searchTerm) {
+            filtered = allNodeData.filter(node => {
+                return (node.label && node.label.toLowerCase().includes(searchTerm)) ||
+                       (node.id && String(node.id).toLowerCase().includes(searchTerm));
+            });
+        }
+
+        // 限制数量
+        filtered = filtered.slice(0, maxNodes);
+
+        // 过滤边
+        const visibleIds = new Set(filtered.map(n => n.id));
+        const filteredEdgeData = allEdgeData.filter(e =>
+            visibleIds.has(e.from) && visibleIds.has(e.to)
+        );
+
+        // 更新显示
+        filteredNodes.clear();
+        filteredEdges.clear();
+
+        if (filtered.length > 0) filteredNodes.add(filtered);
+        if (filteredEdgeData.length > 0) filteredEdges.add(filteredEdgeData);
+
+        document.getElementById('nodeCount').textContent = filtered.length;
+        document.getElementById('edgeCount').textContent = filteredEdgeData.length;
+
+        if (network && filtered.length > 0) {
+            setTimeout(() => {
+                try {
+                    network.fit();
+                } catch(e) {
+                    console.warn('视图调整失败:', e);
+                }
+            }, 500);
+        }
+
+        console.log('✅ 显示', filtered.length, '个节点');
+    }
+
+    // 重置过滤器
+    function resetFilters() {
+        document.getElementById('nodeCountSlider').value = 200;
+        document.getElementById('nodeCountLabel').textContent = '200';
+        document.getElementById('searchInput').value = '';
+        document.querySelectorAll('#entityTypeFilters input').forEach(cb => cb.checked = true);
+        filterGraph();
+    }
+
+    // 处理文档
+    async function processDocument() {
+        if (!selectedFile) {
+            alert('请先选择文件!');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+        isProcessingComplete = false;
+        showProcessing(true, '正在启动处理...');
+
+        try {
+            const response = await fetch('/process_document_async', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+            const result = await response.json();
+            if (result.task_id) {
+                currentTaskId = result.task_id;
+                startProgressMonitoring(result.task_id);
+            }
+        } catch (error) {
+            console.error('处理失败:', error);
+            alert('处理失败: ' + error.message);
+            showProcessing(false);
+            isProcessingComplete = true;
+        }
+    }
+
+    // 监控进度
+    function startProgressMonitoring(taskId) {
+        progressInterval = setInterval(async () => {
+            if (isProcessingComplete) {
+                clearInterval(progressInterval);
+                return;
+            }
+
+            try {
+                const response = await fetch(`/processing_status/${taskId}`);
+                if (!response.ok) throw new Error(`状态查询失败: ${response.status}`);
+
+                const status = await response.json();
+                updateProgressBar(status.progress || 0);
+                document.getElementById('processingMessage').textContent = status.message || '处理中...';
+
+                if (status.status === 'completed' && !isProcessingComplete) {
+                    isProcessingComplete = true;
+                    clearInterval(progressInterval);
+
+                    console.log('处理完成,开始刷新数据');
+
+                    if (status.result) {
+                        console.log('显示分析结果');
+                        displayResults(status.result);
+                    }
+
+                    setTimeout(async () => {
+                        console.log('刷新图谱数据');
+                        await loadGraph();
+                        showProcessing(false);
+
+                        const graphData = status.result?.graph;
+                        const nodeCount = graphData?.graph?.nodes?.length || 0;
+                        const edgeCount = graphData?.graph?.edges?.length || 0;
+
+                        alert(`文档处理成功!耗时 ${status.processing_time?.toFixed(2)}秒\n\n节点: ${nodeCount}\n关系: ${edgeCount}\n事件: ${status.result?.events?.events?.length || 0}`);
+                    }, 1000);
+
+                } else if (status.status === 'error' && !isProcessingComplete) {
+                    isProcessingComplete = true;
+                    clearInterval(progressInterval);
+                    showProcessing(false);
+                    alert('处理失败: ' + (status.error || status.message));
+                }
+            } catch (error) {
+                console.error('进度查询错误:', error);
+            }
+        }, 2000);
+    }
+
+    // 更新进度条
+    function updateProgressBar(progress) {
+        const bar = document.getElementById('progressBar');
+        bar.style.width = progress + '%';
+        bar.textContent = progress + '%';
+    }
+
+    // 加载图谱
+    async function loadGraph() {
+        try {
+            console.log('开始加载图谱...');
+            const response = await fetch('/get_graph');
+            const data = await response.json();
+
+            console.log('图谱数据:', data);
+            console.log('节点数:', data.nodes?.length, '边数:', data.edges?.length);
+
+            if (!data.nodes || data.nodes.length === 0) {
+                console.warn('图谱为空');
+                return;
+            }
+
+            updateGraph(data);
+            console.log('图谱更新完成');
+        } catch (error) {
+            console.error('加载图谱错误:', error);
+        }
+    }
+
+    // 更新图谱
+    function updateGraph(data) {
+        console.log('📄 开始更新图谱, 节点:', data.nodes?.length, '边:', data.edges?.length);
+
+        if (!data || !data.nodes || !data.edges) {
+            console.error('❌ 图谱数据格式错误');
+            return;
+        }
+
+        const nodeColors = {
+            'PERSON': '#667eea',
+            'ORGANIZATION': '#ed8936',
+            'LOCATION': '#48bb78',
+            'PROJECT': '#f6ad55',
+            'CONCEPT': '#fc8181',
+            'default': '#718096'
+        };
+
+        const nameToIdMap = new Map();
+        const nodeData = data.nodes.map((node, index) => {
+            const nodeId = node.name || node.id || `node_${index}`;
+            const nodeName = node.label || node.name || nodeId;
+
+            nameToIdMap.set(nodeName, nodeId);
+            nameToIdMap.set(nodeId, nodeId);
+
+            return {
+                id: nodeId,
+                label: nodeName,
+                type: node.type || 'default',
+                color: nodeColors[node.type] || nodeColors.default,
+                title: `${nodeName}\n类型: ${node.type || 'Unknown'}\n${node.description || ''}`,
+                description: node.description || ''
+            };
+        });
+
+        console.log('✅ 节点处理完成:', nodeData.length);
+        console.log('📋 名称映射表大小:', nameToIdMap.size);
+
+        const edgeData = data.edges.map((edge, i) => {
+            const source = edge.source || edge.from;
+            const target = edge.target || edge.to;
+
+            const fromId = nameToIdMap.get(source) || source;
+            const toId = nameToIdMap.get(target) || target;
+
+            const fromExists = nodeData.some(n => n.id === fromId);
+            const toExists = nodeData.some(n => n.id === toId);
+
+            if (!fromExists || !toExists) {
+                console.warn(`⚠️ 边 ${i} 的节点不存在:`, {
+                    source, target, fromId, toId, fromExists, toExists
+                });
+                return null;
+            }
+
+            return {
+                id: `edge_${i}`,
+                from: fromId,
+                to: toId,
+                label: edge.type || edge.relation || '',
+                arrows: 'to',
+                title: edge.type || edge.relation || '',
+                color: edge.inferred ? { color: '#ffc107' } : undefined
+            };
+        }).filter(edge => edge !== null);
+
+        console.log('✅ 边处理完成:', edgeData.length, '(过滤前:', data.edges.length, ')');
+
+        try {
+            allNodes.clear();
+            allEdges.clear();
+
+            if (nodeData.length > 0) {
+                allNodes.add(nodeData);
+            }
+
+            if (edgeData.length > 0) {
+                allEdges.add(edgeData);
+            }
+
+            console.log('✅ 全局数据集已更新');
+
+            filterGraph();
+
+            setTimeout(() => {
+                if (network && nodeData.length > 0) {
+                    network.fit();
+                    console.log('✅ 视图已调整');
+                }
+            }, 1000);
+
+        } catch (error) {
+            console.error('❌ 图谱更新失败:', error);
+        }
+    }
+
+    // 清空图谱
+    async function clearGraph() {
+        if (!confirm('确定要清空整个图谱吗?')) return;
+
+        try {
+            const response = await fetch('/clear_graph', { method: 'POST' });
+            if (response.ok) {
+                allNodes.clear();
+                allEdges.clear();
+                filteredNodes.clear();
+                filteredEdges.clear();
+                document.getElementById('nodeCount').textContent = '0';
+                document.getElementById('edgeCount').textContent = '0';
+                document.getElementById('entityCount').textContent = '0';
+                document.getElementById('eventCount').textContent = '0';
+
+                resetResultPanels();
+                alert('图谱已清空!');
+            }
+        } catch (error) {
+            console.error('清空错误:', error);
+        }
+    }
+
+    // 重置结果面板
+    function resetResultPanels() {
+        const emptyStates = {
+            'entities-tab': { icon: '🏷️', text: '暂无实体数据', hint: '上传文档后,系统将自动识别实体' },
+            'relations-tab': { icon: '🔗', text: '暂无关系数据', hint: '上传文档后,系统将自动提取关系' },
+            'events-tab': { icon: '📅', text: '暂无事件数据', hint: '上传文档后,系统将自动识别事件' },
+            'enhanced-tab': { icon: '🧠', text: '暂无语义增强数据', hint: '上传文档后,系统将进行语义增强' }
+        };
+
+        Object.entries(emptyStates).forEach(([id, state]) => {
+            const tab = document.getElementById(id);
+            if (tab) {
+                tab.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">${state.icon}</div>
+                        <p>${state.text}</p>
+                        <p style="font-size: 0.9rem; margin-top: 10px;">${state.hint}</p>
+                    </div>
+                `;
+            }
+        });
+    }
+
+    // 显示结果 - 完全修复的版本
+    function displayResults(result) {
+        const entities = result.entities?.entities || result.entity_standardization?.standardized_entities || [];
+        const entitiesTab = document.getElementById('entities-tab');
+        if (entitiesTab) {
+            entitiesTab.innerHTML = entities.length > 0
+                ? entities.map(e => `<span class="entity-tag">${e.word || e.label} (${e.label || e.type})</span>`).join('')
+                : '<div class="empty-state"><div class="empty-state-icon">🏷️</div><p>暂无实体数据</p></div>';
+        }
+        document.getElementById('entityCount').textContent = entities.length;
+
+        const relations = result.all_relations?.relations || result.relations?.relations || [];
+        const relationsTab = document.getElementById('relations-tab');
+        if (relationsTab) {
+            relationsTab.innerHTML = relations.length > 0
+                ? relations.map(r => `<div class="relation-item"><strong>${r[0]}</strong> → ${r[1]} → <strong>${r[2]}</strong></div>`).join('')
+                : '<div class="empty-state"><div class="empty-state-icon">🔗</div><p>暂无关系数据</p></div>';
+        }
+
+        const events = result.events?.events || [];
+        const eventsTab = document.getElementById('events-tab');
+
+        if (eventsTab) {
+            if (events.length > 0) {
+                const eventsHtml = events.map((event, index) => {
+                    if (typeof event === 'string') {
+                        return `<div class="event-item"><strong>事件 ${index + 1}:</strong> ${event}</div>`;
+                    }
+
+                    if (typeof event === 'object' && event !== null) {
+                        let details = [`<strong>事件 ${index + 1}:</strong> ${event.name || event.description || '未命名事件'}`];
+
+                        const fields = {
+                            'type': '类型',
+                            'date': '日期',
+                            'time': '时间',
+                            'organizer': '组织方',
+                            'participants': '参与者',
+                            'location': '地点',
+                            'focus': '关注点',
+                            'description': '描述'
+                        };
+
+                        Object.entries(fields).forEach(([key, label]) => {
+                            if (event[key]) {
+                                const value = Array.isArray(event[key]) ? event[key].join(', ') : event[key];
+                                details.push(`<span style="color: #667eea;">${label}:</span> ${value}`);
+                            }
+                        });
+
+                        if (event.sub_events && Array.isArray(event.sub_events) && event.sub_events.length > 0) {
+                            details.push(`<span style="color: #667eea;">子事件:</span> ${event.sub_events.join(', ')}`);
+                        }
+
+                        if (event.sub_topics && Array.isArray(event.sub_topics) && event.sub_topics.length > 0) {
+                            details.push(`<span style="color: #667eea;">子主题:</span> ${event.sub_topics.join(', ')}`);
+                        }
+
+                        return `<div class="event-item">${details.join('<br>')}</div>`;
+                    }
+
+                    return `<div class="event-item">未知事件格式</div>`;
+                }).join('');
+
+                eventsTab.innerHTML = eventsHtml;
+            } else {
+                eventsTab.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📅</div>
+                        <p>暂无事件数据</p>
+                    </div>
+                `;
+            }
+        }
+
+        document.getElementById('eventCount').textContent = events.length;
+
+        const enhanced = result.semantic_enhancement?.details || [];
+        const enhancedTab = document.getElementById('enhanced-tab');
+        if (enhancedTab) {
+            enhancedTab.innerHTML = enhanced.length > 0
+                ? enhanced.map(e => {
+                    if (e.enhanced === false) return `<div class="relation-item">${e.original} - 未找到增强信息</div>`;
+                    return `<div class="relation-item"><strong>${e.original}</strong><br>QID: ${e.qid || 'N/A'}<br>描述: ${e.enhanced_description || 'N/A'}</div>`;
+                }).join('')
+                : '<div class="empty-state"><div class="empty-state-icon">🧠</div><p>暂无语义增强数据</p></div>';
+        }
+    }
+
+    // 加载最新分析结果
+    async function loadLatestAnalysis() {
+        try {
+            const response = await fetch('/get_latest_analysis');
+            if (!response.ok) return;
+
+            const data = await response.json();
+            if (data.status === 'success' && data.data && data.data.result) {
+                displayResults(data.data.result);
+                const fileInfo = document.getElementById('fileInfo');
+                const fileName = document.getElementById('fileName');
+                if (fileInfo && fileName) {
+                    fileName.textContent = `${data.data.file_name} (上次处理)`;
+                    fileInfo.classList.add('active');
+                }
+            }
+        } catch (error) {
+            console.error('加载分析结果失败:', error);
+        }
+    }
+
+    // 切换标签
+    function switchTab(tabName) {
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.tab === tabName);
+        });
+        document.querySelectorAll('.tab-content').forEach(content => {
+            content.classList.toggle('active', content.id === `${tabName}-tab`);
+        });
+    }
+
+    // 显示/隐藏处理覆盖层
+    function showProcessing(show, message = '') {
+        const overlay = document.getElementById('processingOverlay');
+        overlay.classList.toggle('active', show);
+        if (show && message) {
+            document.getElementById('processingMessage').textContent = message;
+            updateProgressBar(0);
+        }
+    }
+
+    // 导出图谱
+    async function exportGraph() {
+        try {
+            if (!allNodes || allNodes.length === 0) {
+                alert('当前图谱为空,无法导出!');
+                return;
+            }
+
+            const response = await fetch('/export_graph');
+            if (!response.ok) throw new Error(`导出失败: HTTP ${response.status}`);
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `knowledge_graph_${Date.now()}.json`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+            alert('图谱导出成功!');
+        } catch (error) {
+            console.error('导出错误:', error);
+            alert('导出失败: ' + error.message);
+        }
+    }
+
+    // CSV 导出
+    async function exportGraphAsCsv() {
+        try {
+            if (!allNodes || allNodes.length === 0) {
+                alert('当前图谱为空,无法导出!');
+                return;
+            }
+
+            const response = await fetch('/export_graph');
+            if (!response.ok) throw new Error(`导出失败: HTTP ${response.status}`);
+
+            const data = await response.json();
+
+            let nodesCsv = 'ID,标签,类型,描述\n';
+            data.graph.nodes.forEach(node => {
+                nodesCsv += `"${node.name}","${node.label || ''}","${node.type || ''}","${node.description || ''}"\n`;
+            });
+
+            let edgesCsv = '源节点,关系,目标节点,是否推断\n';
+            data.graph.edges.forEach(edge => {
+                edgesCsv += `"${edge.source}","${edge.type}","${edge.target}","${edge.inferred ? '是' : '否'}"\n`;
+            });
+
+            downloadFile(nodesCsv, `nodes_${Date.now()}.csv`, 'text/csv');
+            setTimeout(() => {
+                downloadFile(edgesCsv, `edges_${Date.now()}.csv`, 'text/csv');
+            }, 500);
+
+            alert('CSV 文件已导出(节点和边)');
+        } catch (error) {
+            console.error('导出错误:', error);
+            alert('导出失败: ' + error.message);
+        }
+    }
+
+    // 下载文件辅助函数
+    function downloadFile(content, filename, mimeType) {
+        const blob = new Blob([content], { type: mimeType });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+    }
+
+    // 导入文件处理
+    function handleImportFile(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        if (!file.name.endsWith('.json')) {
+            alert('请选择JSON格式的图谱文件!');
+            return;
+        }
+
+        importGraph(file);
+    }
+
+    // 导入图谱
+    async function importGraph(file) {
+        if (!confirm(`确定要导入图谱吗?\n这将添加文件中的所有节点和关系到当前图谱。\n\n文件名: ${file.name}`)) {
+            document.getElementById('importFileInput').value = '';
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            showProcessing(true, '正在导入图谱...');
+
+            const response = await fetch('/import_graph', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || `HTTP ${response.status}`);
+            }
+
+            const result = await response.json();
+            showProcessing(false);
+            alert(`图谱导入成功!\n\n节点: ${result.nodes_imported}\n关系: ${result.edges_imported}`);
+            await loadGraph();
+        } catch (error) {
+            console.error('导入错误:', error);
+            showProcessing(false);
+            alert('导入失败: ' + error.message);
+        } finally {
+            document.getElementById('importFileInput').value = '';
+        }
+    }
+
+    // 切换历史视图
+    async function toggleHistoryView() {
+        const historyList = document.getElementById('historyList');
+        const btn = document.getElementById('viewHistoryBtn');
+
+        if (historyList.style.display === 'none') {
+            await loadHistoryList();
+            historyList.style.display = 'block';
+            btn.textContent = '隐藏历史';
+        } else {
+            historyList.style.display = 'none';
+            btn.textContent = '查看历史';
+        }
+    }
+
+    // 加载历史列表
+    async function loadHistoryList() {
+        try {
+            const response = await fetch('/get_analysis_history?limit=10');
+            const data = await response.json();
+            const historyList = document.getElementById('historyList');
+
+            if (data.status === 'success' && data.history && data.history.length > 0) {
+                historyList.innerHTML = data.history.map(item => {
+                    const date = new Date(item.processed_at).toLocaleString('zh-CN');
+                    return `
+                        <div style="padding: 10px; margin: 5px 0; background: rgba(102, 126, 234, 0.1);
+                                    border-radius: 5px; cursor: pointer; border-left: 3px solid var(--primary-color);"
+                             onclick="loadAnalysisById('${item.task_id}')">
+                            <div style="font-weight: bold; color: var(--text-primary);">${item.file_name}</div>
+                            <div style="font-size: 0.85rem; color: var(--text-secondary);">
+                                ${date} | ${item.processing_time?.toFixed(2)}秒
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } else {
+                historyList.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-secondary);">暂无历史记录</div>';
+            }
+        } catch (error) {
+            console.error('加载历史失败:', error);
+            document.getElementById('historyList').innerHTML = '<div style="padding: 20px; text-align: center; color: var(--danger-color);">加载失败</div>';
+        }
+    }
+
+    // 加载指定ID的分析结果
+    async function loadAnalysisById(taskId) {
+        try {
+            const response = await fetch(`/get_analysis_by_id/${taskId}`);
+            const data = await response.json();
+
+            if (data.status === 'success' && data.data && data.data.result) {
+                displayResults(data.data.result);
+                alert(`已加载: ${data.data.file_name}`);
+            } else {
+                alert('加载失败');
+            }
+        } catch (error) {
+            console.error('加载失败:', error);
+            alert('加载失败');
+        }
+    }
+
+    // CSV导入功能
+    let selectedNodesFile = null;
+    let selectedEdgesFile = null;
+
+    async function handleCsvNodesImport(event) {
+        selectedNodesFile = event.target.files[0];
+        if (!selectedNodesFile) return;
+
+        if (!selectedNodesFile.name.endsWith('.csv')) {
+            alert('请选择CSV格式的节点文件!');
+            selectedNodesFile = null;
+            event.target.value = '';
+            return;
+        }
+
+        if (confirm('节点文件已选择!\n\n是否也要导入边关系CSV文件?\n\n点击"确定"选择边文件,点击"取消"仅导入节点。')) {
+            document.getElementById('importCsvEdgesInput').click();
+        } else {
+            await importCsvFiles();
+        }
+    }
+
+    async function handleCsvEdgesImport(event) {
+        selectedEdgesFile = event.target.files[0];
+        if (selectedEdgesFile && !selectedEdgesFile.name.endsWith('.csv')) {
+            alert('请选择CSV格式的边文件!');
+            selectedEdgesFile = null;
+            event.target.value = '';
+            return;
+        }
+        await importCsvFiles();
+    }
+
+    async function importCsvFiles() {
+        if (!selectedNodesFile) {
+            alert('请先选择节点CSV文件!');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('nodes_file', selectedNodesFile);
+        if (selectedEdgesFile) {
+            formData.append('edges_file', selectedEdgesFile);
+        }
+
+        try {
+            showProcessing(true, '正在导入CSV文件...');
+
+            const response = await fetch('/import_analysis_csv', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || `HTTP ${response.status}`);
+            }
+
+            const result = await response.json();
+            showProcessing(false);
+            alert(`CSV导入成功!\n\n节点: ${result.nodes_imported}\n关系: ${result.edges_imported}`);
+            await loadGraph();
+        } catch (error) {
+            console.error('CSV导入错误:', error);
+            showProcessing(false);
+            alert('CSV导入失败: ' + error.message);
+        } finally {
+            document.getElementById('importCsvNodesInput').value = '';
+            document.getElementById('importCsvEdgesInput').value = '';
+            selectedNodesFile = null;
+            selectedEdgesFile = null;
+        }
+    }
+</script>
+</body>
+</html>
